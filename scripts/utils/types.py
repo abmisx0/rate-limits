@@ -1,5 +1,6 @@
 import json
 
+
 # Data Struct to store Pool information
 class PoolData:
     def __init__(self, address: str):
@@ -7,10 +8,11 @@ class PoolData:
         self.voting_power = 0
 
     def to_dict(self):
-        return {'address': self.address, 'voting_power': self.voting_power}
+        return {"address": self.address, "voting_power": self.voting_power}
 
     def __repr__(self):
         return json.dumps(self.to_dict(), indent=4)
+
 
 # Data Struct to store Chain information
 class ChainData:
@@ -25,6 +27,7 @@ class ChainData:
 
     def __repr__(self):
         return f"Name: {self.name}\nTotal Voting Weight: {self.total_voting_weight}\nExpected Emissions: {self.expected_emissions}\nExisting Buffer Cap: {self.existing_buffer_cap}\nExisting Rate Limit: {self.existing_rate_limit}\nPools={self.pools}\n"
+
 
 # Data Struct to store new limits for each Chain
 class NewLimitData:

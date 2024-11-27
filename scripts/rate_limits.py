@@ -1,4 +1,3 @@
-import json
 from web3 import Web3
 from utils.types import *
 from utils.constants import *
@@ -19,6 +18,7 @@ chains: dict[int, ChainData] = {
     252: ChainData("Fraxtal", FRAXTAL_RPC_URL),
 }
 
+
 def print_chain_info():
     print("-" * 40)
     for chain_id, chain_data in chains.items():
@@ -26,13 +26,12 @@ def print_chain_info():
         print(chain_data)
         print("-" * 40)  # Divider for clarity
 
+
 def fetch_pools():
     # fetch v2 superchain pools
-    root_pools = root_pool_factory.functions.allPools().call();
-
+    root_pools = root_pool_factory.functions.allPools().call()
     # fetch cl superchain pools
-    cl_root_pools = cl_root_pool_factory.functions.allPools().call();
-
+    cl_root_pools = cl_root_pool_factory.functions.allPools().call()
     # concatenate pool lists
     root_pools.extend(cl_root_pools)
 
@@ -41,6 +40,7 @@ def fetch_pools():
         root_pool = web3.eth.contract(address=pool, abi=root_pool_abi)
         chainid = root_pool.functions.chainid().call()
         chains[chainid].pools.append(PoolData(pool))
+
 
 def fetch_voting_weights():
     superchain_votes = 0
@@ -52,12 +52,14 @@ def fetch_voting_weights():
 
     return superchain_votes
 
+
 def fetch_existing_buffers():
     for chain_id, chain_data in chains.items():
         web3_temp = Web3(Web3.HTTPProvider(chain_data.rpc_url))
         xerc20 = web3_temp.eth.contract(address=XERC20, abi=xerc20_abi)
         chain_data.existing_buffer_cap = xerc20.functions.bufferCap(MESSAGE_MODULE).call()
         chain_data.existing_rate_limit = xerc20.functions.rateLimitPerSecond(MESSAGE_MODULE).call()
+
 
 # Main function
 def main():
@@ -83,8 +85,10 @@ def main():
     print("-" * 40)
     for chain_id, chain_data in chains.items():
         # calculate expected emissions based on chain emissions
-        weights_percentage = chain_data.total_voting_weight/total_voting_weight
-        chain_data.expected_emissions = weekly * weights_percentage * 1.2 # add 1.2x buffer on top of expected emissions
+        weights_percentage = chain_data.total_voting_weight / total_voting_weight
+        chain_data.expected_emissions = (
+            weekly * weights_percentage * 1.2
+        )  # add 1.2x buffer on top of expected emissions
         print(f"Chain ID: {chain_id}")
         print(f"Name: {chain_data.name}")
         print(f"Number of Pools:: {len(chain_data.pools)}")
@@ -98,11 +102,16 @@ def main():
         if chain_data.expected_emissions > chain_data.existing_buffer_cap:
             print("*" * 40)
             print(f"WARNING: Buffer cap should be updated at least to: {chain_data.expected_emissions:.0f}")
-            print(f"WARNING: Rate limit should be updated at least to: {chain_data.expected_emissions / 604800:.0f}")
-            new_chain_limits[chain_id] = NewLimitData(chain_data.name, chain_data.expected_emissions, chain_data.expected_emissions / 604800)
+            print(
+                f"WARNING: Rate limit should be updated at least to: {chain_data.expected_emissions / 604800:.0f}"
+            )
+            new_chain_limits[chain_id] = NewLimitData(
+                chain_data.name, chain_data.expected_emissions, chain_data.expected_emissions / 604800
+            )
         print("-" * 40 + "\n")  # Divider for readability
 
     return new_chain_limits
+
 
 if __name__ == "__main__":
     new_chain_limits = main()
