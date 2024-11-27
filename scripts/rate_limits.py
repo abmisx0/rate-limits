@@ -89,6 +89,8 @@ def main():
         chain_data.expected_emissions = (
             weekly * weights_percentage * 1.2
         )  # add 1.2x buffer on top of expected emissions
+        adjusted_buffer_cap = chain_data.expected_emissions * 2
+        midpoint = chain_data.existing_buffer_cap / 2
         print(f"Chain ID: {chain_id}")
         print(f"Name: {chain_data.name}")
         print(f"Number of Pools:: {len(chain_data.pools)}")
@@ -96,17 +98,16 @@ def main():
         print(f"Chain Voting Weight: {chain_data.total_voting_weight:.0f}")
         print(f"Percentage of Total Votes: {weights_percentage*100:.3f}%")
         print(f"Expected Emissions: {chain_data.expected_emissions:.0f}")
+        print(f"Existing Midpoint: {midpoint:.0f}")
         print(f"Existing Buffer Cap: {chain_data.existing_buffer_cap:.0f}")
-        print(f"Expected Rate Limit: {chain_data.expected_emissions / 604800:.0f}")
+        print(f"Expected Rate Limit: {adjusted_buffer_cap / 604800:.0f}")
         print(f"Existing Rate Limit: {chain_data.existing_rate_limit:.0f}")
-        if chain_data.expected_emissions > chain_data.existing_buffer_cap:
+        if chain_data.expected_emissions > midpoint:
             print("*" * 40)
-            print(f"WARNING: Buffer cap should be updated at least to: {chain_data.expected_emissions:.0f}")
-            print(
-                f"WARNING: Rate limit should be updated at least to: {chain_data.expected_emissions / 604800:.0f}"
-            )
+            print(f"WARNING: Buffer cap should be updated at least to: {adjusted_buffer_cap:.0f}")
+            print(f"WARNING: Rate limit should be updated at least to: {adjusted_buffer_cap / 604800:.0f}")
             new_chain_limits[chain_id] = NewLimitData(
-                chain_data.name, chain_data.expected_emissions, chain_data.expected_emissions / 604800
+                chain_data.name, adjusted_buffer_cap, adjusted_buffer_cap / 604800
             )
         print("-" * 40 + "\n")  # Divider for readability
 
@@ -124,6 +125,7 @@ if __name__ == "__main__":
             print(f"Name: {chain_data.name}")
             print(f"Chain Voting Weight: {chain_data.total_voting_weight / 1e18:.0f}")
             print(f"Expected Emissions: {chain_data.expected_emissions / 1e18:.0f}")
+            print(f"Existing Midpoint: {chain_data.existing_buffer_cap / 2 / 1e18:.0f}")
             print(f"Existing Buffer Cap: {chain_data.existing_buffer_cap / 1e18:.0f}")
             print("-" * 40 + "\n")
     else:
