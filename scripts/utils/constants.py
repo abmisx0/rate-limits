@@ -6,7 +6,7 @@ MODE_RPC_URL = "https://mainnet.mode.network"
 LISK_RPC_URL = "https://rpc.api.lisk.com"
 FRAXTAL_RPC_URL = "https://rpc.frax.com"
 
-# Superchain Contract addresses
+# Superchain Contract addresses & Constants
 ROOT_POOL_FACTORY_ADDRESS = "0x31832f2a97Fd20664D76Cc421207669b55CE4BC0"
 CL_ROOT_POOL_FACTORY_ADDRESS = "0x04625B046C69577EfC40e6c0Bb83CDBAfab5a55F"
 VOTER_ADDRESS = "0x41C914ee0c7E1A5edCD0295623e6dC557B5aBf3C"
@@ -14,6 +14,11 @@ VOTING_ESCROW = "0xFAf8FD17D9840595845582fCB047DF13f006787d"
 XERC20 = "0x7f9AdFbd38b669F03d1d11000Bc76b9AaEA28A81"
 MINTER = "0x6dc9E1C04eE59ed3531d73a72256C0da46D10982"
 MESSAGE_MODULE = "0xF385603a12Be8b7B885222329c581FDD1C30071D"
+WEEK = 604800
+
+# Margin for Limits
+BUFFER_MARGIN = 1.2
+RPS_MARGIN = 1.5
 
 # Superchain Contract ABIs
 root_pool_factory_abi = '[{"inputs":[{"internalType":"address","name":"_implementation","type":"address"},{"internalType":"address","name":"_bridge","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"ChainNotRegistered","type":"error"},{"inputs":[],"name":"ERC1167FailedCreateClone","type":"error"},{"inputs":[],"name":"PoolAlreadyExists","type":"error"},{"inputs":[],"name":"SameAddress","type":"error"},{"inputs":[],"name":"ZeroAddress","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"token0","type":"address"},{"indexed":true,"internalType":"address","name":"token1","type":"address"},{"indexed":true,"internalType":"bool","name":"stable","type":"bool"},{"indexed":false,"internalType":"address","name":"pool","type":"address"},{"indexed":false,"internalType":"uint256","name":"length","type":"uint256"}],"name":"RootPoolCreated","type":"event"},{"inputs":[{"internalType":"uint256","name":"index","type":"uint256"}],"name":"allPools","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"allPools","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"allPoolsLength","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"bridge","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"chainid","type":"uint256"},{"internalType":"address","name":"tokenA","type":"address"},{"internalType":"address","name":"tokenB","type":"address"},{"internalType":"bool","name":"stable","type":"bool"}],"name":"createPool","outputs":[{"internalType":"address","name":"pool","type":"address"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"chainid","type":"uint256"},{"internalType":"address","name":"tokenA","type":"address"},{"internalType":"address","name":"tokenB","type":"address"},{"internalType":"bool","name":"stable","type":"bool"}],"name":"getPool","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"implementation","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"isPair","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"pure","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"isPool","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"pure","type":"function"}]'

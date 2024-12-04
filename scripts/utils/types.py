@@ -24,6 +24,8 @@ class ChainData:
         self.existing_buffer_cap = 0
         self.existing_rate_limit = 0
         self.expected_emissions = 0
+        self.existing_midpoint = 0
+        self.current_limit = 0
 
     def __repr__(self):
         return f"Name: {self.name}\nTotal Voting Weight: {self.total_voting_weight}\nExpected Emissions: {self.expected_emissions}\nExisting Buffer Cap: {self.existing_buffer_cap}\nExisting Rate Limit: {self.existing_rate_limit}\nPools={self.pools}\n"
@@ -31,10 +33,14 @@ class ChainData:
 
 # Data Struct to store new limits for each Chain
 class NewLimitData:
-    def __init__(self, name: str, new_buffer_cap: int, new_rate_limit: int):
+    def __init__(self, name: str, new_buffer_cap: int, new_rate_limit: int, temporary_rate_limit: int):
         self.name = name
         self.new_buffer_cap = new_buffer_cap
         self.new_rate_limit = new_rate_limit
+        self.temporary_rate_limit = temporary_rate_limit
 
     def __repr__(self):
-        return f"Name: {self.name}\nNew Buffer Cap: {self.new_buffer_cap:.0f}\nNew Rate Limit: {self.new_rate_limit:.0f}"
+        if self.temporary_rate_limit == 0:
+            return f"Name: {self.name}\nNew Buffer Cap: {self.new_buffer_cap:.0f}\nNew Rate Limit: {self.new_rate_limit:.0f}"
+        else:
+            return f"Name: {self.name}\nNew Buffer Cap: {self.new_buffer_cap:.0f}\nTemporary Rate Limit: {self.temporary_rate_limit:.0f}\nRate Limit Post Replenishment: {self.new_rate_limit:.0f}"

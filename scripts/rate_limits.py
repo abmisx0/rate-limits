@@ -1,3 +1,4 @@
+import json
 from web3 import Web3
 from utils.types import *
 from utils.constants import *
@@ -59,6 +60,10 @@ def fetch_existing_buffers():
         xerc20 = web3_temp.eth.contract(address=XERC20, abi=xerc20_abi)
         chain_data.existing_buffer_cap = xerc20.functions.bufferCap(MESSAGE_MODULE).call()
         chain_data.existing_rate_limit = xerc20.functions.rateLimitPerSecond(MESSAGE_MODULE).call()
+        chain_data.current_limit = xerc20.functions.mintingCurrentLimitOf(MESSAGE_MODULE).call()
+
+        limit_data = xerc20.functions.rateLimits(MESSAGE_MODULE).call()
+        chain_data.existing_midpoint = limit_data[-1]
 
 
 # Main function
@@ -82,15 +87,36 @@ def main():
 
     new_chain_limits: dict[int, NewLimitData] = {}
 
+    op_buffer_delta = 0
+    op_expected_emissions = 0
     print("-" * 40)
     for chain_id, chain_data in chains.items():
         # calculate expected emissions based on chain emissions
         weights_percentage = chain_data.total_voting_weight / total_voting_weight
-        chain_data.expected_emissions = (
-            weekly * weights_percentage * 1.2
-        )  # add 1.2x buffer on top of expected emissions
-        adjusted_buffer_cap = chain_data.expected_emissions * 2
-        midpoint = chain_data.existing_buffer_cap / 2
+        min_emissions = weekly * weights_percentage
+        min_buffer_cap = min_emissions * 2
+
+        # include margin on estimated values
+        chain_data.expected_emissions = min_emissions * BUFFER_MARGIN
+        adjusted_buffer_cap = min_buffer_cap * BUFFER_MARGIN
+        adjusted_rps = (min_buffer_cap / WEEK) * RPS_MARGIN
+        op_buffer_delta += (
+            adjusted_buffer_cap - chain_data.existing_buffer_cap
+            if adjusted_buffer_cap > chain_data.existing_buffer_cap
+            else 0
+        )
+        op_expected_emissions += chain_data.expected_emissions
+
+        # calculate replenished buffer
+        timestamp = web3.eth.get_block("latest").timestamp
+        epoch_next = timestamp - (timestamp % WEEK) + WEEK
+        time_to_next_epoch = epoch_next - timestamp
+        expected_buffer = chain_data.current_limit + (chain_data.existing_rate_limit * time_to_next_epoch)
+        replenished_buffer = min(
+            expected_buffer, chain_data.existing_midpoint
+        )  # buffer cannot exceed midpoint
+
+        # log results
         print(f"Chain ID: {chain_id}")
         print(f"Name: {chain_data.name}")
         print(f"Number of Pools:: {len(chain_data.pools)}")
@@ -98,18 +124,91 @@ def main():
         print(f"Chain Voting Weight: {chain_data.total_voting_weight:.0f}")
         print(f"Percentage of Total Votes: {weights_percentage*100:.3f}%")
         print(f"Expected Emissions: {chain_data.expected_emissions:.0f}")
-        print(f"Existing Midpoint: {midpoint:.0f}")
+        print(f"Current Limit: {chain_data.current_limit:.0f}")
+        print(f"Replenished Limit: {replenished_buffer}")
+        print(f"Existing Midpoint: {chain_data.existing_midpoint:.0f}")
         print(f"Existing Buffer Cap: {chain_data.existing_buffer_cap:.0f}")
-        print(f"Expected Rate Limit: {adjusted_buffer_cap / 604800:.0f}")
+        print(f"Expected Rate Limit: {adjusted_rps:.0f}")
         print(f"Existing Rate Limit: {chain_data.existing_rate_limit:.0f}")
-        if chain_data.expected_emissions > midpoint:
-            print("*" * 40)
-            print(f"WARNING: Buffer cap should be updated at least to: {adjusted_buffer_cap:.0f}")
-            print(f"WARNING: Rate limit should be updated at least to: {adjusted_buffer_cap / 604800:.0f}")
-            new_chain_limits[chain_id] = NewLimitData(
-                chain_data.name, adjusted_buffer_cap, adjusted_buffer_cap / 604800
+        if chain_data.expected_emissions > replenished_buffer:
+            # recalculate replenished buffer with adjusted limits, 10 minutes before epoch flip
+            timestamp = web3.eth.get_block("latest").timestamp
+            epoch_next = timestamp - (timestamp % WEEK) + WEEK
+            replenish_ts = epoch_next - (60 * 10)  # new limits should replenish 10 minutes before epoch flip
+            # if past last 10 minutes of epoch, limits should replenish until epoch flip instead
+            time_to_next_epoch = (
+                replenish_ts - timestamp if timestamp < replenish_ts else epoch_next - timestamp
             )
+
+            expected_buffer = chain_data.current_limit + (adjusted_rps * time_to_next_epoch)
+            replenished_buffer = min(
+                expected_buffer, adjusted_buffer_cap / 2
+            )  # buffer cannot exceed midpoint
+
+            print("*" * 40)
+            # if new rps is not enough, need to temporarily set a high rps
+            if chain_data.expected_emissions > replenished_buffer:
+                buffer_delta = (adjusted_buffer_cap / 2) - chain_data.current_limit
+                temporary_rps = (
+                    buffer_delta / time_to_next_epoch * RPS_MARGIN
+                )  # new buffer delta should replenish until epoch flip
+
+                print(f"WARNING: Buffer cap should be updated at least to: {adjusted_buffer_cap:.0f}")
+                print(f"WARNING: Rate Limit should be TEMPORARILY updated to: {temporary_rps:.0f}")
+                print(
+                    f"WARNING: After replenishment, Rate Limit should be updated at least to: {adjusted_rps:.0f}"
+                )
+                new_chain_limits[chain_id] = NewLimitData(
+                    chain_data.name, adjusted_buffer_cap, adjusted_rps, temporary_rps
+                )
+            else:
+                print(f"WARNING: Buffer cap should be updated at least to: {adjusted_buffer_cap:.0f}")
+                print(f"WARNING: Rate Limit should be updated at least to: {adjusted_rps:.0f}")
+                new_chain_limits[chain_id] = NewLimitData(
+                    chain_data.name, adjusted_buffer_cap, adjusted_rps, 0
+                )
+
         print("-" * 40 + "\n")  # Divider for readability
+
+    if op_buffer_delta > 0:
+        xerc20 = web3.eth.contract(address=XERC20, abi=xerc20_abi)
+        op_buffer_cap = xerc20.functions.bufferCap(MESSAGE_MODULE).call()
+        op_rate_limit = xerc20.functions.rateLimitPerSecond(MESSAGE_MODULE).call()
+        op_current_limit = xerc20.functions.burningCurrentLimitOf(MESSAGE_MODULE).call()
+
+        timestamp = web3.eth.get_block("latest").timestamp
+        epoch_next = timestamp - (timestamp % WEEK) + WEEK
+        replenish_ts = epoch_next - (60 * 10)  # new limits should replenish 10 minutes before epoch flip
+        # if past last 10 minutes of epoch, limits should replenish until epoch flip instead
+        time_to_next_epoch = replenish_ts - timestamp if timestamp < replenish_ts else epoch_next - timestamp
+
+        adjusted_buffer_cap = op_buffer_delta + op_buffer_cap
+        min_buffer_cap = adjusted_buffer_cap / BUFFER_MARGIN
+        adjusted_rps = (min_buffer_cap / WEEK) * RPS_MARGIN
+
+        expected_buffer = op_current_limit + (adjusted_rps * time_to_next_epoch)
+        replenished_buffer = min(expected_buffer, adjusted_buffer_cap / 2)  # buffer cannot exceed midpoint
+
+        print(f"Chain ID: 10")
+        print(f"Name: Optimism")
+        print("*" * 40)
+        # if new rps is not enough, need to temporarily set a high rps
+        if op_expected_emissions > replenished_buffer:
+            buffer_delta = (adjusted_buffer_cap / 2) - op_current_limit
+            temporary_rps = (
+                buffer_delta / time_to_next_epoch * RPS_MARGIN
+            )  # new buffer delta should replenish until epoch flip
+
+            print(f"WARNING: Buffer cap should be updated at least to: {adjusted_buffer_cap:.0f}")
+            print(f"WARNING: Rate Limit should be TEMPORARILY updated to: {temporary_rps:.0f}")
+            print(
+                f"WARNING: After replenishment, Rate Limit should be updated at least to: {adjusted_rps:.0f}"
+            )
+            new_chain_limits[10] = NewLimitData("Optimism", adjusted_buffer_cap, adjusted_rps, temporary_rps)
+        else:
+            print(f"WARNING: Buffer cap should be updated at least to: {adjusted_buffer_cap:.0f}")
+            print(f"WARNING: Rate Limit should be updated at least to: {adjusted_rps:.0f}")
+            new_chain_limits[10] = NewLimitData("Optimism", adjusted_buffer_cap, adjusted_rps, 0)
 
     return new_chain_limits
 
@@ -125,7 +224,7 @@ if __name__ == "__main__":
             print(f"Name: {chain_data.name}")
             print(f"Chain Voting Weight: {chain_data.total_voting_weight / 1e18:.0f}")
             print(f"Expected Emissions: {chain_data.expected_emissions / 1e18:.0f}")
-            print(f"Existing Midpoint: {chain_data.existing_buffer_cap / 2 / 1e18:.0f}")
+            print(f"Existing Midpoint: {chain_data.existing_midpoint / 1e18:.0f}")
             print(f"Existing Buffer Cap: {chain_data.existing_buffer_cap / 1e18:.0f}")
             print("-" * 40 + "\n")
     else:
